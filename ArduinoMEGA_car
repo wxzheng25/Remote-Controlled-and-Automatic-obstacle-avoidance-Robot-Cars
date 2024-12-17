@@ -1,0 +1,130 @@
+#include <Servo.h>
+
+// Servo and Motor Pins
+#define STEERING_SERVO_PIN 4
+
+#define MOTOR_L_IN1_PIN 7   
+#define MOTOR_L_IN2_PIN 8   
+#define MOTOR_L_PWM_PIN 5   
+
+#define MOTOR_R_IN1_PIN 9   
+#define MOTOR_R_IN2_PIN 10  
+#define MOTOR_R_PWM_PIN 6   
+
+// Ultrasonic and LED Pins
+#define pingPin 22
+#define redLedPin 23
+#define greenLedPin 24
+
+// Constants
+const int OBSTACLE_THRESHOLD = 40; // cm
+const int FORWARD_SPEED = 200;     // PWM for straight forward speed
+const int LEFT_WHEEL_SPEED = 200;  // PWM for left wheel when avoiding
+const int RIGHT_WHEEL_SPEED = 100; // PWM for right wheel when avoiding
+const int STRAIGHT_ANGLE = 90;     // Servo angle for straight
+const int RIGHT_ANGLE = 135;       // Servo angle for turning right
+
+Servo steeringServo;
+
+void setup() {
+  Serial.begin(9600);
+
+  // Servo initialization
+  steeringServo.attach(STEERING_SERVO_PIN);
+  steeringServo.write(STRAIGHT_ANGLE);
+
+  // Motor initialization
+  pinMode(MOTOR_L_IN1_PIN, OUTPUT);
+  pinMode(MOTOR_L_IN2_PIN, OUTPUT);
+  pinMode(MOTOR_L_PWM_PIN, OUTPUT);
+
+  pinMode(MOTOR_R_IN1_PIN, OUTPUT);
+  pinMode(MOTOR_R_IN2_PIN, OUTPUT);
+  pinMode(MOTOR_R_PWM_PIN, OUTPUT);
+
+  stopMotors();
+
+  // LED initialization
+  pinMode(redLedPin, OUTPUT);
+  pinMode(greenLedPin, OUTPUT);
+
+  Serial.println("Setup complete.");
+}
+
+void loop() {
+  long distance = getUltrasonicDistance();
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  if (distance > 0 && distance < OBSTACLE_THRESHOLD) {
+    // Obstacle detected close
+    digitalWrite(redLedPin, HIGH);
+    digitalWrite(greenLedPin, LOW);
+
+    // Turn wheels fully right
+    steeringServo.write(RIGHT_ANGLE);
+
+    // Move forward but turn right by having left wheel faster and right wheel slower
+    digitalWrite(MOTOR_L_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_L_IN2_PIN, LOW);
+    digitalWrite(MOTOR_R_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_R_IN2_PIN, LOW);
+
+    analogWrite(MOTOR_L_PWM_PIN, LEFT_WHEEL_SPEED);
+    analogWrite(MOTOR_R_PWM_PIN, RIGHT_WHEEL_SPEED);
+
+  } else {
+    // Path clear (>=40cm or no reading)
+    digitalWrite(redLedPin, LOW);
+    digitalWrite(greenLedPin, HIGH);
+
+    // Go straight
+    steeringServo.write(STRAIGHT_ANGLE);
+
+    digitalWrite(MOTOR_L_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_L_IN2_PIN, LOW);
+    digitalWrite(MOTOR_R_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_R_IN2_PIN, LOW);
+
+    analogWrite(MOTOR_L_PWM_PIN, FORWARD_SPEED);
+    analogWrite(MOTOR_R_PWM_PIN, FORWARD_SPEED);
+  }
+
+  delay(100); // Small delay to stabilize
+}
+
+// Function to stop motors
+void stopMotors() {
+  digitalWrite(MOTOR_L_IN1_PIN, LOW);
+  digitalWrite(MOTOR_L_IN2_PIN, LOW);
+  analogWrite(MOTOR_L_PWM_PIN, 0);
+
+  digitalWrite(MOTOR_R_IN1_PIN, LOW);
+  digitalWrite(MOTOR_R_IN2_PIN, LOW);
+  analogWrite(MOTOR_R_PWM_PIN, 0);
+}
+
+// Function to get ultrasonic distance
+long getUltrasonicDistance() {
+  long duration, cm;
+
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(pingPin, LOW);
+
+  pinMode(pingPin, INPUT);
+  duration = pulseIn(pingPin, HIGH, 20000UL);
+
+  if (duration == 0) {
+    // No echo received (out of range)
+    return 999; // treat as no obstacle
+  }
+
+  cm = duration / 29 / 2;
+  return cm;
+}
