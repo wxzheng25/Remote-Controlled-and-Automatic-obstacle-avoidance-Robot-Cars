@@ -1,0 +1,54 @@
+#include <SPI.h>
+#include <RH_RF69.h>
+
+#define joystickX A2
+#define joystickY A3
+#define joystickButton 10
+
+// Mode variable: 0 for one mode, 1 for the other
+uint8_t mode = 0;
+
+// Previous button state
+bool prevButtonState = false;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(joystickButton, INPUT_PULLUP);
+  Serial.println("Joystick test initialization complete.");
+}
+
+void loop() {
+  // Read joystick analog values
+  int xValue = analogRead(joystickX);
+  int yValue = analogRead(joystickY);
+
+  // Convert to -100 to 100 range
+  int xMapped = map(xValue, 0, 1023, -100, 100);
+  int yMapped = map(yValue, 0, 1023, -100, 100);
+
+  // Read button state (pressed = LOW)
+  bool buttonPressed = !digitalRead(joystickButton);
+
+  // Detect rising edge of button press (released -> pressed)
+  if (buttonPressed && !prevButtonState) {
+    // Toggle mode
+    mode = (mode == 0) ? 1 : 0;
+    //Serial.print("Mode toggled to: ");
+    //Serial.println(mode == 0 ? "Mode 0" : "Mode 1");
+  }
+
+  // Print out current joystick and button status
+  Serial.print("X: ");
+  Serial.print(xMapped);
+  Serial.print(", Y: ");
+  Serial.print(yMapped);
+  Serial.print(", Button: ");
+  //Serial.println(buttonPressed ? "Pressed" : "Released");
+  Serial.print("mode:");
+  Serial.println(mode);
+
+  // Update previous button state
+  prevButtonState = buttonPressed;
+
+  delay(200);
+}
